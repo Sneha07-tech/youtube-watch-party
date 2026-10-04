@@ -2,7 +2,7 @@
 
 A real-time YouTube Watch Party web application that allows multiple users to watch YouTube videos together with synchronized playback (play/pause/seek/video change) and role-based access control (Host, Moderator, Participant).
 
-> 🚀 **Live Demo URL**: [https://your-app.onrender.com](https://your-app.onrender.com) *(Update this link once your deployment is live)*
+> 🚀 **Live Demo URL**: [https://syncwatch-party.onrender.com](https://syncwatch-party.onrender.com)
 
 ---
 
