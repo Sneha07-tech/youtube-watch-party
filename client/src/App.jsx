@@ -6,7 +6,7 @@ import { VideoPlayer } from './components/VideoPlayer';
 import { ParticipantList } from './components/ParticipantList';
 import { Chat } from './components/Chat';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
 export function App() {
   const [inRoom, setInRoom] = useState(false);

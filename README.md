@@ -2,6 +2,8 @@
 
 A real-time YouTube Watch Party web application that allows multiple users to watch YouTube videos together with synchronized playback (play/pause/seek/video change) and role-based access control (Host, Moderator, Participant).
 
+> 🚀 **Live Demo URL**: [https://your-app.onrender.com](https://your-app.onrender.com) *(Update this link once your deployment is live)*
+
 ---
 
 ## 🌟 Features
@@ -142,22 +144,82 @@ npm run dev
 
 ## 🌐 Public Deployment Guide
 
-### Deploying the Backend on Render
-1. Create a free account on [Render.com](https://render.com).
-2. Click **New +** ➔ **Web Service**.
-3. Connect your GitHub repository.
-4. Set the **Root Directory** to `server`.
-5. Build Command: `npm install`
-6. Start Command: `npm start`
-7. In **Environment Variables**, set:
-   - `PORT`: `5000`
-   - `CLIENT_ORIGIN`: `*` (or your deployed frontend URL)
-8. Copy your Render service URL (e.g., `https://syncwatch-api.onrender.com`).
+This project can be deployed either as a **Single Full-Stack App on Render** (matching the assignment instructions: `https://your-app.onrender.com`), or separately with **Render (Backend) + Vercel (Frontend)**.
 
-### Deploying the Frontend on Vercel
-1. Create a free account on [Vercel.com](https://vercel.com).
-2. Import the GitHub repository.
-3. Set the **Root Directory** to `client`.
-4. In **Environment Variables**, add:
-   - `VITE_BACKEND_URL`: `https://your-render-backend-url.onrender.com`
-5. Click **Deploy**.
+### Option 1: Full-Stack Deployment on Render (Recommended)
+This deploys both the backend WebSocket server and the React frontend in a single Web Service under one URL with zero CORS configuration.
+
+1. Create a free account on [Render.com](https://render.com) and log in.
+2. Click **New +** ➔ **Web Service**.
+3. Connect your GitHub repository (`Sneha07-tech/youtube-watch-party`).
+4. Configure the service settings:
+   - **Name**: `youtube-watch-party` (or your choice)
+   - **Region**: Any close region (e.g. *Singapore* or *Frankfurt*)
+   - **Branch**: `main`
+   - **Root Directory**: *(Leave empty / root)*
+   - **Runtime**: `Node`
+   - **Build Command**: `npm run render-build`
+   - **Start Command**: `npm start`
+   - **Instance Type**: `Free`
+5. Click **Deploy Web Service**.
+6. When deployment finishes, Render provides your live URL: `https://<your-service-name>.onrender.com`.
+7. Test the health check at `https://<your-service-name>.onrender.com/health` and open the root URL in your browser to start your watch party!
+
+---
+
+### Option 2: Render (Backend) + Vercel (Frontend)
+
+If you prefer hosting the frontend on Vercel's global CDN:
+
+#### Step 1: Deploy Backend on Render
+1. In [Render.com](https://render.com), click **New +** ➔ **Web Service**.
+2. Select your repository.
+3. Settings:
+   - **Root Directory**: `server`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Environment Variables**:
+     - `PORT`: `5000`
+     - `CLIENT_ORIGIN`: `*`
+4. Click **Deploy Web Service** and copy your backend URL (e.g., `https://syncwatch-api.onrender.com`).
+
+#### Step 2: Deploy Frontend on Vercel
+1. Log in to [Vercel.com](https://vercel.com) and click **Add New...** ➔ **Project**.
+2. Import `youtube-watch-party`.
+3. Settings:
+   - **Framework Preset**: `Vite`
+   - **Root Directory**: `client`
+   - **Environment Variables**:
+     - `VITE_BACKEND_URL`: `https://syncwatch-api.onrender.com` (from Step 1)
+4. Click **Deploy**.
+
+---
+
+## 💡 Code Understanding & Architecture Readiness
+
+Be prepared to discuss these key technical decisions during evaluation:
+
+### 1. How WebSockets Enable Real-Time Synchronization
+- Traditional HTTP polling requires repeated requests, introducing latency and server overhead.
+- WebSockets provide a persistent, bi-directional, full-duplex TCP connection between clients and the server via **Socket.IO**.
+- When a Host pauses, seeks, or loads a new video, an event is emitted to the server with timestamp data. The server updates the central room state and immediately broadcasts (`socket.to(roomId).emit(...)`) to all other room members with minimal latency (<50ms).
+
+### 2. Echo / Anti-Loop Protection
+- When Bob's player receives a programmatic `pause` from Alice via the server, triggering `player.pauseVideo()` natively fires YouTube's `onStateChange` event.
+- Without protection, Bob's client would detect this event and emit another `pause` back to the server, creating an infinite echo loop.
+- **Solution**: A temporary flag `isRemoteAction.current = true` is set before invoking programmatic player methods, discarding any echo emissions triggered by remote sync.
+
+### 3. Backend Role-Based Access Control (RBAC)
+- All authorization checks are enforced **server-side** in [`Room.js`](file:///server/src/models/Room.js) and socket handlers:
+  - `play`, `pause`, `seek`, `change_video` require `Host` or `Moderator`.
+  - `assign_role` and `remove_participant` strictly require `Host`.
+- Even if a malicious participant modifies client code to emit forbidden events, the server rejects unauthorized actions with an `error_message`.
+
+### 4. OOP Architecture on the Backend
+- **[`Room`](file:///server/src/models/Room.js)**: Encapsulates room state (current time, video ID, playback status), participant collections, role verification, and dynamic elapsed-time calculation.
+- **[`Participant`](file:///server/src/models/Participant.js)**: Encapsulates user identity, socket mapping, role assignment, and serialization.
+- **Modular Handlers**: [`roomHandler.js`](file:///server/src/socket/roomHandler.js) and [`playbackHandler.js`](file:///server/src/socket/playbackHandler.js) keep networking logic decoupled from core domain models.
+
+### 5. Deployment Choices & Platform Limits
+- **WebSocket Persistence**: Free serverless functions (like standard Vercel API routes) terminate after short timeouts and cannot hold persistent WebSockets. A persistent container on Render keeps connections active.
+- **Spin-Down on Free Tier**: Render free services sleep after 15 minutes of inactivity; the initial request requires ~30–50s spin-up time.
